@@ -1,0 +1,38 @@
+# Dependency directories
+node_modules/
+venv/
+env/
+ENV/
+*.log
+
+# Build outputs
+dist/
+build/
+.oxlintrc.json
+
+# Local database directories
+chroma_db/
+
+# Secret and configuration files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.env
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Testing cache
+.pytest_cache/
+__pycache__/
+*.pyc
+.nyc_output/
+coverage/

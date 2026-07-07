@@ -1,0 +1,3 @@
+Build a GenAI-powered civic platform that helps citizens access government services, report public issues, and receive personalized assistance through an intelligent AI companion.
+
+The solution must use Generative AI to simplify complex government information, answer citizen queries, recommend relevant public services, assist with document requirements, track complaints, and provide multilingual support. It should promote transparency, accessibility, and digital inclusion while making everyday civic interactions faster, smarter, and more user-friendly.
