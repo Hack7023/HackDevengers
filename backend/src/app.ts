@@ -21,7 +21,9 @@ app.disable('x-powered-by');
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:4173',
-  'https://hackdevengers.vercel.app',        // Update with your deployed frontend URL
+  'https://hackdevengers.vercel.app',
+  'https://hack-devengers.vercel.app',
+  // Update with your deployed frontend URL
   process.env.FRONTEND_URL,                  // Allow override via env var
 ].filter(Boolean) as string[];
 
