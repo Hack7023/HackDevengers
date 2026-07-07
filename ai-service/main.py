@@ -2,8 +2,8 @@ import os
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, validator
-from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, field_validator
+from typing import Optional
 from dotenv import load_dotenv
 from rag_engine import CivicDocRAGEngine
 
@@ -16,7 +16,8 @@ app = FastAPI(title="Civic Platform AI Engine", version="1.0.0")
 ALLOWED_ORIGINS = list(filter(None, [
     "http://localhost:5173",
     "http://localhost:4173",
-    "https://hackdevengers.vercel.app",          # Update with deployed frontend URL
+    "https://hackdevengers.vercel.app",  
+    "https://civic-backend-rm2c.onrender.com",        # Update with deployed frontend URL
     os.environ.get("FRONTEND_URL"),               # Allow override via env var
 ]))
 
@@ -49,13 +50,14 @@ def verify_ingest_api_key(request: Request):
             detail="Forbidden: Invalid or missing X-API-Key header"
         )
 
-# ─── Request Models with Validation ─────────────────────────────────────────
+# ─── Request Models with Pydantic V2 Validation ──────────────────────────────
 class QueryPayload(BaseModel):
     query: str
     limit: Optional[int] = 3
 
-    @validator("query")
-    def query_not_empty_and_max_length(cls, v):
+    @field_validator("query")
+    @classmethod
+    def query_not_empty_and_max_length(cls, v: str) -> str:
         v = v.strip()
         if not v:
             raise ValueError("Query cannot be empty")
@@ -63,8 +65,9 @@ class QueryPayload(BaseModel):
             raise ValueError("Query must be under 1000 characters")
         return v
 
-    @validator("limit")
-    def limit_in_range(cls, v):
+    @field_validator("limit")
+    @classmethod
+    def limit_in_range(cls, v: Optional[int]) -> Optional[int]:
         if v is not None and not (1 <= v <= 10):
             raise ValueError("Limit must be between 1 and 10")
         return v
@@ -75,21 +78,24 @@ class IngestPayload(BaseModel):
     text_content: str
     category: str
 
-    @validator("doc_id", "title", "category")
-    def no_empty_strings(cls, v, field):
+    @field_validator("doc_id", "title", "category")
+    @classmethod
+    def no_empty_strings(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError(f"{field.name} cannot be empty")
+            raise ValueError("Field cannot be empty")
         return v
 
-    @validator("title")
-    def title_max_length(cls, v):
+    @field_validator("title")
+    @classmethod
+    def title_max_length(cls, v: str) -> str:
         if len(v) > 200:
             raise ValueError("Title must be under 200 characters")
         return v
 
-    @validator("text_content")
-    def text_content_max_length(cls, v):
+    @field_validator("text_content")
+    @classmethod
+    def text_content_max_length(cls, v: str) -> str:
         if len(v) > 100_000:
             raise ValueError("text_content must be under 100,000 characters")
         return v
