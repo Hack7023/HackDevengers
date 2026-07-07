@@ -16,7 +16,8 @@ app = FastAPI(title="Civic Platform AI Engine", version="1.0.0")
 ALLOWED_ORIGINS = list(filter(None, [
     "http://localhost:5173",
     "http://localhost:4173",
-    "https://hackdevengers.vercel.app",  
+    "https://hackdevengers.vercel.app", 
+    "https://hack-devengers.vercel.app", 
     "https://civic-backend-rm2c.onrender.com",        # Update with deployed frontend URL
     os.environ.get("FRONTEND_URL"),               # Allow override via env var
 ]))
