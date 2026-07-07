@@ -30,6 +30,11 @@ import app, { connectDB } from '../app';
 import { User } from '../models/User';
 import { Complaint } from '../models/Complaint';
 
+// Valid ObjectId strings for use in tests
+const MOCK_USER_OID    = new mongoose.Types.ObjectId().toHexString();
+const MOCK_COMPLAINT_OID = new mongoose.Types.ObjectId().toHexString();
+const OTHER_OID        = new mongoose.Types.ObjectId().toHexString();
+
 jest.mock('../models/User', () => {
   const findByIdMock = jest.fn();
   function MockUser(this: any, data: any) {
@@ -119,28 +124,43 @@ describe('Gateway API Endpoints & DB Helper', () => {
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('User Save Database Error');
     });
+
+    it('should return 400 for invalid email format', async () => {
+      const response = await request(app)
+        .post('/api/users')
+        .send({ email: 'not-an-email' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Validation failed');
+    });
   });
 
   describe('GET /api/users/:id', () => {
-    it('should successfully retrieve a user', async () => {
+    it('should successfully retrieve a user with a valid ObjectId', async () => {
       const mockFindById = (User as any).findById as jest.Mock;
       mockFindById.mockResolvedValueOnce({
-        _id: 'mock-user-id',
+        _id: MOCK_USER_OID,
         email: 'citizen@example.com',
         preferredLanguage: 'en'
       });
 
-      const response = await request(app).get('/api/users/mock-user-id');
+      const response = await request(app).get(`/api/users/${MOCK_USER_OID}`);
       expect(response.status).toBe(200);
-      expect(response.body._id).toBe('mock-user-id');
+      expect(response.body._id).toBe(MOCK_USER_OID);
       expect(response.body.email).toBe('citizen@example.com');
+    });
+
+    it('should return 400 for non-ObjectId user id', async () => {
+      const response = await request(app).get('/api/users/not-an-objectid');
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Validation failed');
     });
 
     it('should return 404 if user does not exist', async () => {
       const mockFindById = (User as any).findById as jest.Mock;
       mockFindById.mockResolvedValueOnce(null);
 
-      const response = await request(app).get('/api/users/non-existent-id');
+      const response = await request(app).get(`/api/users/${OTHER_OID}`);
       expect(response.status).toBe(404);
       expect(response.body.error).toBe('User not found');
     });
@@ -149,20 +169,35 @@ describe('Gateway API Endpoints & DB Helper', () => {
       const mockFindById = (User as any).findById as jest.Mock;
       mockFindById.mockRejectedValueOnce(new Error('DB FindById Error'));
 
-      const response = await request(app).get('/api/users/invalid-id');
+      const response = await request(app).get(`/api/users/${MOCK_USER_OID}`);
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('DB FindById Error');
     });
   });
 
   describe('POST /api/complaints', () => {
-    it('should fail if required fields are missing', async () => {
+    it('should fail with validation error if required fields are missing', async () => {
       const response = await request(app)
         .post('/api/complaints')
         .send({ title: 'Broken water tap' });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toContain('Missing required parameters');
+      expect(response.body.error).toBe('Validation failed');
+    });
+
+    it('should fail if citizenId is not a valid ObjectId', async () => {
+      const response = await request(app)
+        .post('/api/complaints')
+        .send({
+          citizenId: 'non-existent-citizen',
+          title: 'Pothole on Main St',
+          description: 'Large pothole blocking the road',
+          category: 'Infrastructure',
+          location: { latitude: 12.9716, longitude: 77.5946 }
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Validation failed');
     });
 
     it('should fail if citizenId user does not exist in DB', async () => {
@@ -172,9 +207,9 @@ describe('Gateway API Endpoints & DB Helper', () => {
       const response = await request(app)
         .post('/api/complaints')
         .send({
-          citizenId: 'non-existent-citizen',
+          citizenId: OTHER_OID,
           title: 'Pothole on Main St',
-          description: 'Large pothole',
+          description: 'Large pothole blocking the road',
           category: 'Infrastructure',
           location: { latitude: 12.9716, longitude: 77.5946 }
         });
@@ -184,17 +219,16 @@ describe('Gateway API Endpoints & DB Helper', () => {
     });
 
     it('should create and return a new complaint if inputs are valid', async () => {
-      const citizenId = 'mock-user-id';
       const mockUserFindById = (User as any).findById as jest.Mock;
       mockUserFindById.mockResolvedValueOnce({
-        _id: citizenId,
+        _id: MOCK_USER_OID,
         email: 'citizen@example.com'
       });
 
       const response = await request(app)
         .post('/api/complaints')
         .send({
-          citizenId,
+          citizenId: MOCK_USER_OID,
           title: 'Pothole on Main St',
           description: 'Large pothole blocking the road',
           category: 'Infrastructure',
@@ -207,19 +241,16 @@ describe('Gateway API Endpoints & DB Helper', () => {
     });
 
     it('should trigger catch block and error middleware on database save failure', async () => {
-      const citizenId = 'mock-user-id';
       const mockUserFindById = (User as any).findById as jest.Mock;
-      mockUserFindById.mockResolvedValueOnce({
-        _id: citizenId
-      });
+      mockUserFindById.mockResolvedValueOnce({ _id: MOCK_USER_OID });
       (Complaint as any).shouldFailSave = true;
 
       const response = await request(app)
         .post('/api/complaints')
         .send({
-          citizenId,
+          citizenId: MOCK_USER_OID,
           title: 'Pothole St',
-          description: 'Pothole',
+          description: 'Pothole blocking road',
           category: 'Infrastructure',
           location: { latitude: 12.9716, longitude: 77.5946 },
         });
@@ -245,16 +276,22 @@ describe('Gateway API Endpoints & DB Helper', () => {
       expect(mockPopulate).toHaveBeenCalledWith('citizenId');
     });
 
-    it('should filter complaints by citizenId when provided', async () => {
+    it('should filter complaints by citizenId when provided (valid ObjectId)', async () => {
       const mockPopulate = jest.fn().mockResolvedValueOnce([
-        { _id: 'complaint-1', title: 'Complaint 1', citizenId: 'mock-user-id' }
+        { _id: 'complaint-1', title: 'Complaint 1', citizenId: MOCK_USER_OID }
       ]);
       const mockFind = (Complaint as any).find as jest.Mock;
       mockFind.mockReturnValueOnce({ populate: mockPopulate });
 
-      const response = await request(app).get('/api/complaints?citizenId=mock-user-id');
+      const response = await request(app).get(`/api/complaints?citizenId=${MOCK_USER_OID}`);
       expect(response.status).toBe(200);
-      expect(mockFind).toHaveBeenCalledWith({ citizenId: 'mock-user-id' });
+      expect(mockFind).toHaveBeenCalledWith({ citizenId: MOCK_USER_OID });
+    });
+
+    it('should return 400 if citizenId query param is not a valid ObjectId', async () => {
+      const response = await request(app).get('/api/complaints?citizenId=mock-user-id');
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Validation failed');
     });
 
     it('should pass find exceptions to next middleware', async () => {
@@ -270,18 +307,24 @@ describe('Gateway API Endpoints & DB Helper', () => {
   });
 
   describe('GET /api/complaints/:id', () => {
-    it('should successfully retrieve a complaint by ID', async () => {
+    it('should successfully retrieve a complaint by valid ObjectId', async () => {
       const mockPopulate = jest.fn().mockResolvedValueOnce({
-        _id: 'mock-complaint-id',
+        _id: MOCK_COMPLAINT_OID,
         title: 'Broken lights'
       });
       const mockFindById = (Complaint as any).findById as jest.Mock;
       mockFindById.mockReturnValueOnce({ populate: mockPopulate });
 
-      const response = await request(app).get('/api/complaints/mock-complaint-id');
+      const response = await request(app).get(`/api/complaints/${MOCK_COMPLAINT_OID}`);
       expect(response.status).toBe(200);
-      expect(response.body._id).toBe('mock-complaint-id');
+      expect(response.body._id).toBe(MOCK_COMPLAINT_OID);
       expect(response.body.title).toBe('Broken lights');
+    });
+
+    it('should return 400 for non-ObjectId complaint id', async () => {
+      const response = await request(app).get('/api/complaints/not-an-objectid');
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Validation failed');
     });
 
     it('should return 404 if complaint not found', async () => {
@@ -289,7 +332,7 @@ describe('Gateway API Endpoints & DB Helper', () => {
       const mockFindById = (Complaint as any).findById as jest.Mock;
       mockFindById.mockReturnValueOnce({ populate: mockPopulate });
 
-      const response = await request(app).get('/api/complaints/non-existent-id');
+      const response = await request(app).get(`/api/complaints/${OTHER_OID}`);
       expect(response.status).toBe(404);
       expect(response.body.error).toBe('Complaint not found');
     });
@@ -300,7 +343,7 @@ describe('Gateway API Endpoints & DB Helper', () => {
         throw new Error('Database connection lost');
       });
 
-      const response = await request(app).get('/api/complaints/some-id');
+      const response = await request(app).get(`/api/complaints/${MOCK_COMPLAINT_OID}`);
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Database connection lost');
     });
@@ -309,7 +352,7 @@ describe('Gateway API Endpoints & DB Helper', () => {
   describe('POST /api/complaints/:id/updates', () => {
     it('should successfully add updates log to a complaint', async () => {
       const mockSave = jest.fn().mockResolvedValueOnce({
-        _id: 'mock-complaint-id',
+        _id: MOCK_COMPLAINT_OID,
         status: 'In Progress',
         updates: [
           { status: 'Pending', note: 'Complaint submitted' },
@@ -318,14 +361,14 @@ describe('Gateway API Endpoints & DB Helper', () => {
       });
       const mockFindById = (Complaint as any).findById as jest.Mock;
       mockFindById.mockResolvedValueOnce({
-        _id: 'mock-complaint-id',
+        _id: MOCK_COMPLAINT_OID,
         status: 'Pending',
         updates: [{ status: 'Pending', note: 'Complaint submitted' }],
         save: mockSave
       });
 
       const response = await request(app)
-        .post('/api/complaints/mock-complaint-id/updates')
+        .post(`/api/complaints/${MOCK_COMPLAINT_OID}/updates`)
         .send({ status: 'In Progress', note: 'Working on it' });
 
       expect(response.status).toBe(200);
@@ -336,11 +379,29 @@ describe('Gateway API Endpoints & DB Helper', () => {
 
     it('should fail with 400 if status is not provided', async () => {
       const response = await request(app)
-        .post('/api/complaints/mock-complaint-id/updates')
+        .post(`/api/complaints/${MOCK_COMPLAINT_OID}/updates`)
         .send({ note: 'Missing status' });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Status is required');
+      expect(response.body.error).toBe('Validation failed');
+    });
+
+    it('should fail with 400 if status is an invalid value', async () => {
+      const response = await request(app)
+        .post(`/api/complaints/${MOCK_COMPLAINT_OID}/updates`)
+        .send({ status: 'UNKNOWN_STATUS' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Validation failed');
+    });
+
+    it('should return 400 for non-ObjectId complaint id on update', async () => {
+      const response = await request(app)
+        .post('/api/complaints/bad-id/updates')
+        .send({ status: 'Resolved' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Validation failed');
     });
 
     it('should return 404 if complaint to update is not found', async () => {
@@ -348,7 +409,7 @@ describe('Gateway API Endpoints & DB Helper', () => {
       mockFindById.mockResolvedValueOnce(null);
 
       const response = await request(app)
-        .post('/api/complaints/non-existent-id/updates')
+        .post(`/api/complaints/${OTHER_OID}/updates`)
         .send({ status: 'Resolved' });
 
       expect(response.status).toBe(404);
@@ -358,14 +419,14 @@ describe('Gateway API Endpoints & DB Helper', () => {
     it('should trigger error middleware on database save error', async () => {
       const mockFindById = (Complaint as any).findById as jest.Mock;
       mockFindById.mockResolvedValueOnce({
-        _id: 'mock-complaint-id',
+        _id: MOCK_COMPLAINT_OID,
         status: 'Pending',
         updates: [],
         save: jest.fn().mockRejectedValueOnce(new Error('Update Save Failed'))
       });
 
       const response = await request(app)
-        .post('/api/complaints/mock-complaint-id/updates')
+        .post(`/api/complaints/${MOCK_COMPLAINT_OID}/updates`)
         .send({ status: 'In Progress' });
 
       expect(response.status).toBe(500);
@@ -374,10 +435,18 @@ describe('Gateway API Endpoints & DB Helper', () => {
   });
 
   describe('POST /api/chat', () => {
-    it('should fail if query is missing', async () => {
+    it('should fail with validation error if query is missing', async () => {
       const response = await request(app).post('/api/chat').send({});
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Query is required');
+      expect(response.body.error).toBe('Validation failed');
+    });
+
+    it('should fail with 400 if query exceeds 1000 chars', async () => {
+      const response = await request(app)
+        .post('/api/chat')
+        .send({ query: 'a'.repeat(1001) });
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Validation failed');
     });
 
     it('should proxy query to python service if available and respond ok', async () => {

@@ -13,13 +13,25 @@ build/
 # Local database directories
 chroma_db/
 
-# Secret and configuration files
+# Secret and configuration files – explicitly cover all subdirectories
 .env
 .env.local
 .env.development
 .env.test
 .env.production
 *.env
+**/.env
+**/.env.local
+**/.env.development
+**/.env.test
+**/.env.production
+backend/.env*
+ai-service/.env*
+frontend/.env*
+# Never commit actual API keys or DB credentials
+secrets.json
+*.pem
+*.key
 
 # IDE & Editor files
 .vscode/

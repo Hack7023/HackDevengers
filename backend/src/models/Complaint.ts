@@ -22,9 +22,9 @@ export interface IComplaint extends Document {
 
 const ComplaintSchema = new Schema<IComplaint>({
   citizenId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  title: { type: String, required: true },
-  description: { type: String, required: true },
-  category: { type: String, required: true },
+  title: { type: String, required: true, maxlength: 100 },
+  description: { type: String, required: true, maxlength: 2000 },
+  category: { type: String, required: true, maxlength: 50 },
   location: {
     latitude: { type: Number, required: true },
     longitude: { type: Number, required: true }
