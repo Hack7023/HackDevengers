@@ -62,6 +62,8 @@ const SAMPLE_SERVICES: PublicService[] = [
   }
 ];
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function App() {
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<'services' | 'report' | 'track' | 'companion'>('services');
@@ -97,7 +99,7 @@ export default function App() {
   useEffect(() => {
     const initializeCitizenSession = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/users', {
+        const response = await fetch(`${API_URL}/api/users`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ preferredLanguage: currentLang })
@@ -118,7 +120,7 @@ export default function App() {
     if (!citizenId) return;
     setTrackerLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/complaints?citizenId=${citizenId}`);
+      const response = await fetch(`${API_URL}/api/complaints?citizenId=${citizenId}`);
       if (response.ok) {
         const data = await response.json();
         setComplaints(data);
@@ -147,7 +149,7 @@ export default function App() {
   const handleSimplifyDocument = async (service: PublicService) => {
     setSimplifyingId(service.id);
     try {
-      const response = await fetch('http://localhost:5000/api/chat', {
+      const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -184,7 +186,7 @@ export default function App() {
     setSubmitLoading(true);
     setReportStatusMsg(null);
     try {
-      const response = await fetch('http://localhost:5000/api/complaints', {
+      const response = await fetch(`${API_URL}/api/complaints`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -253,7 +255,7 @@ export default function App() {
     setChatLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/chat', {
+      const response = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
